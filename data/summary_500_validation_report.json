@@ -1,0 +1,35 @@
+{
+  "source": "pairs_summary_500.jsonl",
+  "total": 500,
+  "valid": 435,
+  "invalid": 65,
+  "type_counts": {
+    "summary_rewrite": 500
+  },
+  "status_counts": {
+    "ok": 449,
+    "empty": 51
+  },
+  "invalid_reasons": {
+    "generation_failed": 51,
+    "empty_summary": 30,
+    "rewrite_too_short:0": 51,
+    "rewrite_too_short:43": 1,
+    "chat_prefix": 3,
+    "rewrite_too_short:20": 1,
+    "rewrite_too_short:115": 1,
+    "rewrite_too_short:21": 1,
+    "rewrite_too_short:9": 1,
+    "rewrite_too_short:8": 1,
+    "rewrite_too_short:18": 1,
+    "rewrite_too_short:54": 1,
+    "rewrite_too_short:78": 1,
+    "rewrite_too_short:85": 1,
+    "rewrite_too_short:105": 1
+  },
+  "valid_rewrite_length": {
+    "min": 120,
+    "max": 371,
+    "mean": 226.4
+  }
+}

@@ -1,0 +1,299 @@
+{
+  "params": {
+    "max_depth": 3,
+    "learning_rate": 0.05,
+    "n_estimators": 800,
+    "subsample": 0.8,
+    "colsample_bytree": 0.6,
+    "min_child_weight": 5,
+    "reg_lambda": 1.0,
+    "objective": "binary:logistic",
+    "eval_metric": "auc",
+    "tree_method": "hist",
+    "random_state": 2026,
+    "n_jobs": 8,
+    "early_stopping_rounds": 50
+  },
+  "experiments": [
+    {
+      "name": "current_raw",
+      "freq_mode": "raw",
+      "feature_groups": [
+        "len",
+        "lex",
+        "pos",
+        "fw",
+        "tf",
+        "bg"
+      ],
+      "n_features": 220,
+      "best_iteration": 358,
+      "val": {
+        "auc": 0.9110454178984144,
+        "accuracy": 0.8442622950819673,
+        "f1": 0.822429906542056,
+        "human_fp_rate": 0.03278688524590164,
+        "ai_recall": 0.7213114754098361,
+        "n": 122
+      },
+      "test": {
+        "auc": 0.9849918875067604,
+        "accuracy": 0.9127906976744186,
+        "f1": 0.9112426035502958,
+        "human_fp_rate": 0.06976744186046512,
+        "ai_recall": 0.8953488372093024,
+        "n": 172
+      }
+    },
+    {
+      "name": "current_log",
+      "freq_mode": "log",
+      "feature_groups": [
+        "len",
+        "lex",
+        "pos",
+        "fw",
+        "ltf",
+        "lbg"
+      ],
+      "n_features": 220,
+      "best_iteration": 174,
+      "val": {
+        "auc": 0.9000268744961032,
+        "accuracy": 0.8278688524590164,
+        "f1": 0.8141592920353983,
+        "human_fp_rate": 0.09836065573770492,
+        "ai_recall": 0.7540983606557377,
+        "n": 122
+      },
+      "test": {
+        "auc": 0.9820173066522444,
+        "accuracy": 0.9186046511627907,
+        "f1": 0.9176470588235294,
+        "human_fp_rate": 0.06976744186046512,
+        "ai_recall": 0.9069767441860465,
+        "n": 172
+      }
+    },
+    {
+      "name": "no_length_raw",
+      "freq_mode": "raw",
+      "feature_groups": [
+        "lex",
+        "pos",
+        "fw",
+        "tf",
+        "bg"
+      ],
+      "n_features": 208,
+      "best_iteration": 5,
+      "val": {
+        "auc": 0.8501746842246708,
+        "accuracy": 0.7459016393442623,
+        "f1": 0.7207207207207207,
+        "human_fp_rate": 0.16393442622950818,
+        "ai_recall": 0.6557377049180327,
+        "n": 122
+      },
+      "test": {
+        "auc": 0.955110870740941,
+        "accuracy": 0.8662790697674418,
+        "f1": 0.8571428571428571,
+        "human_fp_rate": 0.06976744186046512,
+        "ai_recall": 0.8023255813953488,
+        "n": 172
+      }
+    },
+    {
+      "name": "no_length_log",
+      "freq_mode": "log",
+      "feature_groups": [
+        "lex",
+        "pos",
+        "fw",
+        "ltf",
+        "lbg"
+      ],
+      "n_features": 208,
+      "best_iteration": 3,
+      "val": {
+        "auc": 0.8564901908089223,
+        "accuracy": 0.7868852459016393,
+        "f1": 0.7678571428571429,
+        "human_fp_rate": 0.13114754098360656,
+        "ai_recall": 0.7049180327868853,
+        "n": 122
+      },
+      "test": {
+        "auc": 0.930097349918875,
+        "accuracy": 0.8313953488372093,
+        "f1": 0.8361581920903954,
+        "human_fp_rate": 0.19767441860465115,
+        "ai_recall": 0.8604651162790697,
+        "n": 172
+      }
+    },
+    {
+      "name": "lexical_raw",
+      "freq_mode": "raw",
+      "feature_groups": [
+        "lex",
+        "tf",
+        "bg"
+      ],
+      "n_features": 157,
+      "best_iteration": 278,
+      "val": {
+        "auc": 0.9013705993012631,
+        "accuracy": 0.8442622950819673,
+        "f1": 0.8347826086956521,
+        "human_fp_rate": 0.09836065573770492,
+        "ai_recall": 0.7868852459016393,
+        "n": 122
+      },
+      "test": {
+        "auc": 0.9808004326663061,
+        "accuracy": 0.9302325581395349,
+        "f1": 0.9285714285714286,
+        "human_fp_rate": 0.046511627906976744,
+        "ai_recall": 0.9069767441860465,
+        "n": 172
+      }
+    },
+    {
+      "name": "lexical_log",
+      "freq_mode": "log",
+      "feature_groups": [
+        "lex",
+        "ltf",
+        "lbg"
+      ],
+      "n_features": 157,
+      "best_iteration": 221,
+      "val": {
+        "auc": 0.8938457403923675,
+        "accuracy": 0.8032786885245902,
+        "f1": 0.7966101694915254,
+        "human_fp_rate": 0.16393442622950818,
+        "ai_recall": 0.7704918032786885,
+        "n": 122
+      },
+      "test": {
+        "auc": 0.980124391563007,
+        "accuracy": 0.9127906976744186,
+        "f1": 0.9101796407185628,
+        "human_fp_rate": 0.05813953488372093,
+        "ai_recall": 0.8837209302325582,
+        "n": 172
+      }
+    },
+    {
+      "name": "freq_only_raw",
+      "freq_mode": "raw",
+      "feature_groups": [
+        "tf",
+        "bg"
+      ],
+      "n_features": 150,
+      "best_iteration": 220,
+      "val": {
+        "auc": 0.9088954582101585,
+        "accuracy": 0.8360655737704918,
+        "f1": 0.8181818181818182,
+        "human_fp_rate": 0.06557377049180328,
+        "ai_recall": 0.7377049180327869,
+        "n": 122
+      },
+      "test": {
+        "auc": 0.9725527312060573,
+        "accuracy": 0.9186046511627907,
+        "f1": 0.9176470588235294,
+        "human_fp_rate": 0.06976744186046512,
+        "ai_recall": 0.9069767441860465,
+        "n": 172
+      }
+    },
+    {
+      "name": "freq_only_log",
+      "freq_mode": "log",
+      "feature_groups": [
+        "ltf",
+        "lbg"
+      ],
+      "n_features": 150,
+      "best_iteration": 237,
+      "val": {
+        "auc": 0.9148078473528622,
+        "accuracy": 0.8360655737704918,
+        "f1": 0.8305084745762712,
+        "human_fp_rate": 0.13114754098360656,
+        "ai_recall": 0.8032786885245902,
+        "n": 122
+      },
+      "test": {
+        "auc": 0.9663331530557058,
+        "accuracy": 0.9186046511627907,
+        "f1": 0.9186046511627907,
+        "human_fp_rate": 0.08139534883720931,
+        "ai_recall": 0.9186046511627907,
+        "n": 172
+      }
+    },
+    {
+      "name": "lexical_pos_raw",
+      "freq_mode": "raw",
+      "feature_groups": [
+        "lex",
+        "pos",
+        "tf",
+        "bg"
+      ],
+      "n_features": 165,
+      "best_iteration": 6,
+      "val": {
+        "auc": 0.8490997043805428,
+        "accuracy": 0.7950819672131147,
+        "f1": 0.7787610619469026,
+        "human_fp_rate": 0.13114754098360656,
+        "ai_recall": 0.7213114754098361,
+        "n": 122
+      },
+      "test": {
+        "auc": 0.951460248783126,
+        "accuracy": 0.8662790697674418,
+        "f1": 0.8622754491017964,
+        "human_fp_rate": 0.10465116279069768,
+        "ai_recall": 0.8372093023255814,
+        "n": 172
+      }
+    },
+    {
+      "name": "lexical_pos_log",
+      "freq_mode": "log",
+      "feature_groups": [
+        "lex",
+        "pos",
+        "ltf",
+        "lbg"
+      ],
+      "n_features": 165,
+      "best_iteration": 6,
+      "val": {
+        "auc": 0.8478903520558989,
+        "accuracy": 0.7704918032786885,
+        "f1": 0.7407407407407407,
+        "human_fp_rate": 0.11475409836065574,
+        "ai_recall": 0.6557377049180327,
+        "n": 122
+      },
+      "test": {
+        "auc": 0.9553136830719308,
+        "accuracy": 0.9011627906976745,
+        "f1": 0.8994082840236687,
+        "human_fp_rate": 0.08139534883720931,
+        "ai_recall": 0.8837209302325582,
+        "n": 172
+      }
+    }
+  ]
+}

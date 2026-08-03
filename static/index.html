@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>文味 Detect · AI 文本检测器</title>
+<style>
+  :root {
+    --ink: #1a1a1a;
+    --ink-soft: #6b6b6b;
+    --paper: #faf9f7;
+    --surface: #ffffff;
+    --line: #e8e5e0;
+    --accent: #1a4fd8;
+    --green: #1e9e6a;
+    --amber: #c07f1c;
+    --red: #c63b3b;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+
+  /* ---- 顶栏 ---- */
+  header {
+    padding: 28px 0 8px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--line);
+  }
+  .brand { font-size: 22px; font-weight: 700; letter-spacing: 0.02em; }
+  .brand em { font-style: normal; color: var(--accent); }
+  .brand-sub { font-size: 13px; color: var(--ink-soft); margin-top: 2px; }
+  .model-tag { font-size: 12px; color: var(--ink-soft); }
+
+  /* ---- 主工作区 ---- */
+  main { padding: 40px 0 80px; }
+  .stage-title { font-size: 15px; color: var(--ink-soft); margin-bottom: 14px; }
+
+  .editor {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 8px;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  .editor:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(26,79,216,.08); }
+  textarea {
+    width: 100%;
+    min-height: 280px;
+    border: none;
+    outline: none;
+    resize: vertical;
+    font: 15px/1.9 inherit;
+    color: var(--ink);
+    background: transparent;
+    padding: 12px 14px;
+  }
+  textarea::placeholder { color: #b5b0a8; }
+
+  .editor-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px 6px;
+    border-top: 1px solid var(--line);
+  }
+  .counter { font-size: 12.5px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+
+  .actions { display: flex; gap: 10px; align-items: center; }
+  .btn {
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink-soft);
+    padding: 9px 18px;
+    border-radius: 999px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all .18s;
+  }
+  .btn:hover { border-color: var(--ink); color: var(--ink); }
+  .btn-primary {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: #fff;
+    font-weight: 600;
+    min-width: 128px;
+    display: inline-flex;
+    justify-content: center;
+    gap: 8px;
+    align-items: center;
+  }
+  .btn-primary:hover { background: #000; }
+  .btn-primary:disabled { opacity: .55; cursor: not-allowed; }
+  .spinner {
+    width: 14px; height: 14px;
+    border: 2px solid rgba(255,255,255,.35);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    display: none;
+  }
+  .btn-primary.loading .spinner { display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ---- 结果区 ---- */
+  #result { margin-top: 56px; display: none; }
+  #result.show { display: block; animation: rise .5s cubic-bezier(.2,.7,.2,1); }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+
+  .result-head {
+    display: flex;
+    align-items: flex-end;
+    gap: 32px;
+    padding-bottom: 28px;
+    border-bottom: 1px solid var(--line);
+    flex-wrap: wrap;
+  }
+  .score-wrap { display: flex; flex-direction: column; }
+  .score-num {
+    font-size: 72px;
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+  .score-label { font-size: 13px; color: var(--ink-soft); margin-top: 6px; }
+
+  .verdict { flex: 1; min-width: 220px; }
+  .verdict-badge {
+    display: inline-block;
+    padding: 7px 16px;
+    border-radius: 999px;
+    font-size: 15px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .verdict-desc { font-size: 13.5px; color: var(--ink-soft); margin-top: 10px; max-width: 420px; }
+  .text { color: var(--green); } .low { color: var(--amber); } .mid { color: var(--red); } .high { color: var(--red); }
+
+  .meter { width: 100%; margin-top: 26px; }
+  .meter-track { height: 6px; border-radius: 3px; background: var(--line); position: relative; overflow: hidden; }
+  .meter-fill {
+    position: absolute; left: 0; top: 0; bottom: 0;
+    width: 0; border-radius: 3px;
+    transition: width .9s cubic-bezier(.2,.7,.2,1);
+    background: linear-gradient(90deg, var(--green), var(--amber) 50%, var(--red));
+  }
+  .meter-scale { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--ink-soft); margin-top: 6px; }
+
+  /* ---- 风格统计 ---- */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0;
+    margin: 30px 0;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--surface);
+  }
+  .stat { padding: 16px 20px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .stat:nth-child(4n) { border-right: none; }
+  .stat:nth-last-child(-n+4) { border-bottom: none; }
+  .stat b { display: block; font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stat span { font-size: 12px; color: var(--ink-soft); }
+  .stat .unit { font-size: 12px; color: var(--ink-soft); font-weight: 400; }
+
+  /* ---- 分段明细 ---- */
+  .seg-title { font-size: 15px; color: var(--ink-soft); margin: 40px 0 14px; display: flex; align-items: baseline; gap: 8px; }
+  .seg-title b { color: var(--ink); font-size: 15px; }
+
+  .seg-list { border-top: 1px solid var(--line); }
+  .seg {
+    display: grid;
+    grid-template-columns: 64px 1fr;
+    gap: 18px;
+    padding: 16px 4px;
+    border-bottom: 1px solid var(--line);
+  }
+  .seg-score { text-align: right; }
+  .seg-score b { font-size: 19px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .seg-score span { display: block; font-size: 11.5px; color: var(--ink-soft); }
+  .seg-body { min-width: 0; }
+  .seg-bar { height: 3px; border-radius: 2px; background: var(--line); margin-bottom: 10px; overflow: hidden; }
+  .seg-bar i { display: block; height: 100%; width: 0; transition: width .7s ease; background: currentColor; }
+  .seg-text {
+    font-size: 14px; color: var(--ink-soft); line-height: 1.8;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .seg-flag {
+    display: inline-block; font-size: 11px; padding: 1px 8px; border-radius: 999px;
+    margin-left: 8px; vertical-align: 1px;
+  }
+  .seg-meta { margin-top: 6px; }
+  .seg-branch { font-size: 11.5px; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+  .flag-ai { background: rgba(198,59,59,.1); color: var(--red); }
+  .flag-human { background: rgba(30,158,106,.1); color: var(--green); }
+
+  footer { padding: 30px 0 50px; color: #b5b0a8; font-size: 12px; border-top: 1px solid var(--line); }
+
+  @media (max-width: 720px) {
+    .score-num { font-size: 56px; }
+    .seg { grid-template-columns: 54px 1fr; gap: 12px; }
+  }
+</style>
+</head>
+<body>
+<header class="wrap">
+  <div>
+    <div class="brand">文味 <em>Detect</em></div>
+    <div class="brand-sub">AI 文本味检测 · 网文域</div>
+  </div>
+  <div class="model-tag">文味 Detect 2.0 · 句式 Transformer + 词汇 XGBoost 双分支融合 · 442 对风格模仿训练</div>
+</header>
+
+<main class="wrap">
+  <div class="stage-title">输入文本</div>
+
+  <div class="editor">
+    <textarea id="input" placeholder="粘贴要检测的文本，20000 字以内。支持整段或整章粘贴，会自动分句分段逐段评分。"></textarea>
+    <div class="editor-foot">
+      <div class="counter"><span id="count">0</span> 字</div>
+      <div class="actions">
+        <button class="btn" id="sample">填入示例</button>
+        <button class="btn" id="clear">清空</button>
+        <button class="btn btn-primary" id="detect">
+          <span class="spinner"></span><span id="detect-txt">检测</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="result">
+    <div class="result-head">
+      <div class="score-wrap">
+        <div class="score-num" id="scoreNum">--</div>
+        <div class="score-label">存在 AI 生成的概率 · 0–1</div>
+        <div class="score-label" id="subScores" style="margin-top:10px;font-size:12.5px;"></div>
+      </div>
+      <div class="verdict">
+        <div><span class="verdict-badge" id="verdictBadge">--</span></div>
+        <div class="verdict-desc" id="verdictDesc"></div>
+        <div class="verdict-desc" id="notes" style="color:var(--amber);"></div>
+      </div>
+    </div>
+
+    <div class="meter">
+      <div class="meter-track"><div class="meter-fill" id="meterFill"></div></div>
+      <div class="meter-scale"><span>0 不可能</span><span>0.35</span><span>0.55</span><span>0.75</span><span>1 确定存在</span></div>
+    </div>
+
+    <div class="stats" id="stats"></div>
+
+    <div class="seg-title"><b id="segSummary"></b></div>
+    <div class="seg-list" id="segList"></div>
+  </div>
+</main>
+
+<footer class="wrap">检测基于 2.0 双分支融合模型：句式 Transformer（句法序列）+ 词汇 XGBoost（词汇特征），442 对网文风格模仿训练。判定仅供参考，不构成唯一证据。</footer>
+
+<script>
+const SAMPLE = "苏璃缓缓睁开双眼，目光深邃而清冷，仿佛能看穿世间一切虚妄。她微微抬起玉手，指尖凝聚起一缕淡蓝色的光芒，那光芒逐渐变得明亮，映照着她绝美的脸庞。她心中暗暗想到，无论如何都要找到那个神秘的少年，因为他是解开一切谜团的关键。夜空下，微风轻轻拂过她的发丝，带着一丝凉意，也让她的思绪渐渐清晰。她身形微微一晃，下一刻便消失在了原地，只留下一句幽幽的话语，在风中缓缓消散。与此同时，远处的山巅之上，一道身影悄然浮现，他静静凝视着远方，嘴角泛起一抹若有若无的笑意，眼中却闪烁着深邃的光芒，仿佛早已看穿了一切。" ;
+
+const $ = id => document.getElementById(id);
+const input = $("input"), count = $("count"), result = $("result");
+
+input.addEventListener("input", () => count.textContent = input.value.length);
+$("sample").addEventListener("click", () => { input.value = SAMPLE; count.textContent = SAMPLE.length; result.classList.remove("show"); });
+$("clear").addEventListener("click", () => { input.value = ""; count.textContent = 0; result.classList.remove("show"); });
+
+function levelColor(level) {
+  return level === "text" ? "var(--green)" : level === "low" ? "var(--amber)" : "var(--red)";
+}
+
+async function detect() {
+  const text = input.value.trim();
+  if (!text) return;
+  const btn = $("detect");
+  btn.classList.add("loading");
+  btn.disabled = true;
+  $("detect-txt").textContent = "检测中";
+  result.classList.remove("show");
+
+  try {
+    const res = await fetch("/api/detect", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    const data = await res.json();
+    if (data.error) { alert(data.error); return; }
+    render(data);
+  } catch (e) {
+    alert("检测失败：" + e.message);
+  } finally {
+    btn.classList.remove("loading");
+    btn.disabled = false;
+    $("detect-txt").textContent = "检测";
+  }
+}
+$("detect").addEventListener("click", detect);
+
+function render(data) {
+  // 主显示统一为「存在 AI 生成的概率」
+  const s = data.ai_presence ?? data.overall_score;
+  // 判定档位与后端阈值一致（0.35 / 0.55 / 0.75）
+  const level = s >= 0.75 ? "high" : s >= 0.55 ? "mid" : s >= 0.35 ? "low" : "text";
+  const label = s >= 0.75 ? "高度疑似 AI" : s >= 0.55 ? "疑似 AI" : s >= 0.35 ? "不确定" : "偏人类";
+  const color = levelColor(level);
+
+  $("scoreNum").textContent = s.toFixed(3);
+  $("scoreNum").style.color = color;
+  const badge = $("verdictBadge");
+  badge.textContent = label;
+  badge.style.background = color;
+  $("verdictDesc").textContent =
+    s >= 0.75 ? "文本高度疑似由 AI 生成，建议仔细核查来源。" :
+    s >= 0.55 ? "部分段落具有明显 AI 写作特征，存在 AI 生成嫌疑。" :
+    s >= 0.35 ? "整体接近人类文笔，个别段落仍可留意。" :
+    "文笔特征与人类样本一致，未检测到明显 AI 生成痕迹。";
+  $("notes").textContent = data.uncertain && data.notes ? "提示：" + data.notes.join("；") : "";
+  $("subScores").textContent =
+    `按段落字数加权平均 · 综合评分 ${(data.overall_score ?? s).toFixed(3)}`;
+  setTimeout(() => { $("meterFill").style.width = (s * 100) + "%"; }, 60);
+
+  // 风格统计
+  const st = data.stats;
+  const items = [
+    ["字数", st.chars + "", ""],
+    ["句子数", st.sentence_count + "", ""],
+  ];
+  $("stats").innerHTML = items.map(([k, v, u]) =>
+    `<div class="stat"><b>${v}<span class="unit"> ${u}</span></b><span>${k}</span></div>`).join("");
+
+  // 分段（按 AI 疑似率从高到低排列）
+  const segs = data.segments.slice().sort((a, b) => b.score - a.score);
+  const aiCnt = segs.filter(x => x.ai).length;
+  $("segSummary").textContent = `${segs.length} 段 · ${aiCnt} 段偏高 AI 味`;
+
+  $("segList").innerHTML = segs.map(g => {
+    const c = levelColor(g.score >= 0.75 ? "high" : g.score >= 0.55 ? "mid" : g.score >= 0.35 ? "low" : "text");
+    const branches = g.syntax_score != null
+      ? `<span class="seg-branch">句式 ${g.syntax_score.toFixed(2)} · 词汇 ${g.lexical_score.toFixed(2)} · 证据 ${g.evidence != null ? g.evidence.toFixed(2) : "--"}</span>`
+      : "";
+    return `<div class="seg">
+      <div class="seg-score" style="color:${c}">
+        <b>${g.score.toFixed(2)}</b>
+        <span>${g.ai ? "偏 AI" : "类人"}</span>
+      </div>
+      <div class="seg-body" style="color:${c}">
+        <div class="seg-bar"><i style="width:${(g.score*100).toFixed(0)}%"></i></div>
+        <div class="seg-text">${g.text}<span class="seg-flag ${g.ai ? "flag-ai" : "flag-human"}">${g.ai ? "AI" : "人"}</span></div>
+        <div class="seg-meta">${branches}</div>
+      </div>
+    </div>`;
+  }).join("");
+
+  result.classList.add("show");
+}
+</script>
+</body>
+</html>

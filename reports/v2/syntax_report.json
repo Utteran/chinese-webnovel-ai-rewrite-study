@@ -1,0 +1,74 @@
+{
+  "branch": "syntax_transformer",
+  "input": "dep_seq (pos:deprel)",
+  "model": "hfl/chinese-roberta-wwm-ext",
+  "device": "cuda",
+  "train": 590,
+  "val": {
+    "auc": 0.7761354474603601,
+    "accuracy": 0.7295081967213115,
+    "f1": 0.736,
+    "human_fp_rate": 0.29508196721311475,
+    "ai_recall": 0.7540983606557377,
+    "n": 122
+  },
+  "test": {
+    "auc": 0.8289616008653325,
+    "accuracy": 0.7441860465116279,
+    "f1": 0.7528089887640449,
+    "human_fp_rate": 0.29069767441860467,
+    "ai_recall": 0.7790697674418605,
+    "n": 172
+  },
+  "best_val_auc": 0.7761354474603601,
+  "history": [
+    {
+      "epoch": 1,
+      "train_loss": 0.7021989838497059,
+      "val_auc": 0.6737436173071755,
+      "val_acc": 0.5,
+      "val_human_fp": 0.0,
+      "val_ai_recall": 0.0
+    },
+    {
+      "epoch": 2,
+      "train_loss": 0.7117711353946377,
+      "val_auc": 0.7272238645525395,
+      "val_acc": 0.5,
+      "val_human_fp": 1.0,
+      "val_ai_recall": 1.0
+    },
+    {
+      "epoch": 3,
+      "train_loss": 0.7004511984618934,
+      "val_auc": 0.6914807847352862,
+      "val_acc": 0.6639344262295082,
+      "val_human_fp": 0.08196721311475409,
+      "val_ai_recall": 0.4098360655737705
+    },
+    {
+      "epoch": 4,
+      "train_loss": 0.671061775168857,
+      "val_auc": 0.7457672668637463,
+      "val_acc": 0.5491803278688525,
+      "val_human_fp": 0.8524590163934426,
+      "val_ai_recall": 0.9508196721311475
+    },
+    {
+      "epoch": 5,
+      "train_loss": 0.620709935555587,
+      "val_auc": 0.7532921257726417,
+      "val_acc": 0.6967213114754098,
+      "val_human_fp": 0.39344262295081966,
+      "val_ai_recall": 0.7868852459016393
+    },
+    {
+      "epoch": 6,
+      "train_loss": 0.5912095292194469,
+      "val_auc": 0.7761354474603601,
+      "val_acc": 0.7295081967213115,
+      "val_human_fp": 0.29508196721311475,
+      "val_ai_recall": 0.7540983606557377
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.ipynb_checkpoints/
+
+# ---- 环境与密钥 ----
+.env
+.env.*
+*.key
+*.pem
+
+# ---- 模型权重（体积大，超 GitHub 100MB 限制，不纳入版本管理）----
+model/
+
+# ---- 编辑器/IDE ----
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# ---- 日志与临时文件 ----
+*.log
+tmp/
+*.tmp

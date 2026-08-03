@@ -1,0 +1,64 @@
+{
+  "model": "hfl/chinese-roberta-wwm-ext",
+  "data": "transformer_data.jsonl",
+  "device": "cuda",
+  "pairs": 435,
+  "train": 580,
+  "val": {
+    "auc": 1.0,
+    "accuracy": 0.9637681159420289,
+    "f1": 0.9624060150375939,
+    "human_fp_rate": 0.0,
+    "ai_recall": 0.927536231884058
+  },
+  "test": {
+    "auc": 0.9996537396121883,
+    "accuracy": 0.9144736842105263,
+    "f1": 0.9064748201438849,
+    "human_fp_rate": 0.0,
+    "ai_recall": 0.8289473684210527
+  },
+  "best_val_auc": 1.0,
+  "history": [
+    {
+      "auc": 1.0,
+      "accuracy": 0.9637681159420289,
+      "f1": 0.9624060150375939,
+      "human_fp_rate": 0.0,
+      "ai_recall": 0.927536231884058,
+      "n": 138,
+      "epoch": 1,
+      "train_loss": 0.34939960551422994
+    },
+    {
+      "auc": 1.0,
+      "accuracy": 1.0,
+      "f1": 1.0,
+      "human_fp_rate": 0.0,
+      "ai_recall": 1.0,
+      "n": 138,
+      "epoch": 2,
+      "train_loss": 0.05665449531295815
+    },
+    {
+      "auc": 1.0,
+      "accuracy": 1.0,
+      "f1": 1.0,
+      "human_fp_rate": 0.0,
+      "ai_recall": 1.0,
+      "n": 138,
+      "epoch": 3,
+      "train_loss": 0.010315230166589891
+    },
+    {
+      "auc": 1.0,
+      "accuracy": 1.0,
+      "f1": 1.0,
+      "human_fp_rate": 0.0,
+      "ai_recall": 1.0,
+      "n": 138,
+      "epoch": 4,
+      "train_loss": 0.0031976713358449773
+    }
+  ]
+}
