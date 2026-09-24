@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>文味 Detect · AI 文本检测器</title>
+<title>中文网文 AI 仿写识别研究</title>
 <style>
   :root {
     --ink: #1a1a1a;
@@ -215,10 +215,10 @@
 <body>
 <header class="wrap">
   <div>
-    <div class="brand">文味 <em>Detect</em></div>
-    <div class="brand-sub">AI 文本味检测 · 网文域</div>
+    <div class="brand">网文 <em>仿写研究</em></div>
+    <div class="brand-sub">词汇与句法信号 · 探索性实验</div>
   </div>
-  <div class="model-tag">文味 Detect 2.0 · 句式 Transformer + 词汇 XGBoost 双分支融合 · 442 对风格模仿训练</div>
+  <div class="model-tag">句法 Transformer + 词汇 XGBoost · 442 对风格模仿样本</div>
 </header>
 
 <main class="wrap">
@@ -242,7 +242,7 @@
     <div class="result-head">
       <div class="score-wrap">
         <div class="score-num" id="scoreNum">--</div>
-        <div class="score-label">存在 AI 生成的概率 · 0–1</div>
+        <div class="score-label">实验仿写类分数 · 0–1</div>
         <div class="score-label" id="subScores" style="margin-top:10px;font-size:12.5px;"></div>
       </div>
       <div class="verdict">
@@ -254,7 +254,7 @@
 
     <div class="meter">
       <div class="meter-track"><div class="meter-fill" id="meterFill"></div></div>
-      <div class="meter-scale"><span>0 不可能</span><span>0.35</span><span>0.55</span><span>0.75</span><span>1 确定存在</span></div>
+      <div class="meter-scale"><span>0 原文倾向</span><span>0.35</span><span>0.55</span><span>0.75</span><span>1 仿写倾向</span></div>
     </div>
 
     <div class="stats" id="stats"></div>
@@ -264,13 +264,16 @@
   </div>
 </main>
 
-<footer class="wrap">检测基于 2.0 双分支融合模型：句式 Transformer（句法序列）+ 词汇 XGBoost（词汇特征），442 对网文风格模仿训练。判定仅供参考，不构成唯一证据。</footer>
+<footer class="wrap">探索性科研原型：分数表示与本研究 DeepSeek 风格仿写样本的相似倾向，不能当作真实 AI 生成概率或文本来源证据。训练数据仅覆盖 442 对中文网文样本。</footer>
 
 <script>
 const SAMPLE = "苏璃缓缓睁开双眼，目光深邃而清冷，仿佛能看穿世间一切虚妄。她微微抬起玉手，指尖凝聚起一缕淡蓝色的光芒，那光芒逐渐变得明亮，映照着她绝美的脸庞。她心中暗暗想到，无论如何都要找到那个神秘的少年，因为他是解开一切谜团的关键。夜空下，微风轻轻拂过她的发丝，带着一丝凉意，也让她的思绪渐渐清晰。她身形微微一晃，下一刻便消失在了原地，只留下一句幽幽的话语，在风中缓缓消散。与此同时，远处的山巅之上，一道身影悄然浮现，他静静凝视着远方，嘴角泛起一抹若有若无的笑意，眼中却闪烁着深邃的光芒，仿佛早已看穿了一切。" ;
 
 const $ = id => document.getElementById(id);
 const input = $("input"), count = $("count"), result = $("result");
+const escapeHtml = text => String(text).replace(/[&<>"']/g, char => ({
+  "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+})[char]);
 
 input.addEventListener("input", () => count.textContent = input.value.length);
 $("sample").addEventListener("click", () => { input.value = SAMPLE; count.textContent = SAMPLE.length; result.classList.remove("show"); });
@@ -309,11 +312,10 @@ async function detect() {
 $("detect").addEventListener("click", detect);
 
 function render(data) {
-  // 主显示统一为「存在 AI 生成的概率」
-  const s = data.ai_presence ?? data.overall_score;
+  const s = data.overall_score;
   // 判定档位与后端阈值一致（0.35 / 0.55 / 0.75）
   const level = s >= 0.75 ? "high" : s >= 0.55 ? "mid" : s >= 0.35 ? "low" : "text";
-  const label = s >= 0.75 ? "高度疑似 AI" : s >= 0.55 ? "疑似 AI" : s >= 0.35 ? "不确定" : "偏人类";
+  const label = data.verdict.label;
   const color = levelColor(level);
 
   $("scoreNum").textContent = s.toFixed(3);
@@ -322,11 +324,11 @@ function render(data) {
   badge.textContent = label;
   badge.style.background = color;
   $("verdictDesc").textContent =
-    s >= 0.75 ? "文本高度疑似由 AI 生成，建议仔细核查来源。" :
-    s >= 0.55 ? "部分段落具有明显 AI 写作特征，存在 AI 生成嫌疑。" :
-    s >= 0.35 ? "整体接近人类文笔，个别段落仍可留意。" :
-    "文笔特征与人类样本一致，未检测到明显 AI 生成痕迹。";
-  $("notes").textContent = data.uncertain && data.notes ? "提示：" + data.notes.join("；") : "";
+    s >= 0.75 ? "在本实验数据中明显接近风格仿写样本；无法据此判断真实来源。" :
+    s >= 0.55 ? "在本实验数据中更接近风格仿写样本；无法据此判断真实来源。" :
+    s >= 0.35 ? "两类实验样本的分数接近，解释应格外谨慎。" :
+    "在本实验数据中更接近原文样本；无法据此排除 AI 参与。";
+  $("notes").textContent = data.notes?.length ? "提示：" + data.notes.join("；") : "";
   $("subScores").textContent =
     `按段落字数加权平均 · 综合评分 ${(data.overall_score ?? s).toFixed(3)}`;
   setTimeout(() => { $("meterFill").style.width = (s * 100) + "%"; }, 60);
@@ -340,24 +342,24 @@ function render(data) {
   $("stats").innerHTML = items.map(([k, v, u]) =>
     `<div class="stat"><b>${v}<span class="unit"> ${u}</span></b><span>${k}</span></div>`).join("");
 
-  // 分段（按 AI 疑似率从高到低排列）
+  // 分段（按实验仿写类分数从高到低排列）
   const segs = data.segments.slice().sort((a, b) => b.score - a.score);
   const aiCnt = segs.filter(x => x.ai).length;
-  $("segSummary").textContent = `${segs.length} 段 · ${aiCnt} 段偏高 AI 味`;
+  $("segSummary").textContent = `${segs.length} 段 · ${aiCnt} 段偏向实验仿写类`;
 
   $("segList").innerHTML = segs.map(g => {
     const c = levelColor(g.score >= 0.75 ? "high" : g.score >= 0.55 ? "mid" : g.score >= 0.35 ? "low" : "text");
     const branches = g.syntax_score != null
-      ? `<span class="seg-branch">句式 ${g.syntax_score.toFixed(2)} · 词汇 ${g.lexical_score.toFixed(2)} · 证据 ${g.evidence != null ? g.evidence.toFixed(2) : "--"}</span>`
+      ? `<span class="seg-branch">句式 ${g.syntax_score.toFixed(2)} · 词汇 ${g.lexical_score.toFixed(2)} · 阈值超出量 ${g.evidence != null ? g.evidence.toFixed(2) : "--"}</span>`
       : "";
     return `<div class="seg">
       <div class="seg-score" style="color:${c}">
         <b>${g.score.toFixed(2)}</b>
-        <span>${g.ai ? "偏 AI" : "类人"}</span>
+        <span>${g.ai ? "仿写倾向" : "原文倾向"}</span>
       </div>
       <div class="seg-body" style="color:${c}">
         <div class="seg-bar"><i style="width:${(g.score*100).toFixed(0)}%"></i></div>
-        <div class="seg-text">${g.text}<span class="seg-flag ${g.ai ? "flag-ai" : "flag-human"}">${g.ai ? "AI" : "人"}</span></div>
+        <div class="seg-text">${escapeHtml(g.text)}<span class="seg-flag ${g.ai ? "flag-ai" : "flag-human"}">${g.ai ? "仿写" : "原文"}</span></div>
         <div class="seg-meta">${branches}</div>
       </div>
     </div>`;

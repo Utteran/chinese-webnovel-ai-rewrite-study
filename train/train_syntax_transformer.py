@@ -11,8 +11,6 @@ V2 阶段6: 句式分支 Transformer 训练
           并保存 val/test 预测概率（供融合层使用）
 """
 import os
-os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
-os.environ["HF_HUB_ENDPOINT"] = "https://hf-mirror.com"
 import json
 import random
 import numpy as np

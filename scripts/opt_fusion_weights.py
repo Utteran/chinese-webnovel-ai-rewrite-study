@@ -6,12 +6,13 @@ V2 阶段10(实验): 两分支评分占比(w_syntax)优化实验
      验证默认等权(w=0.5)是否为最优，并尝试按段落字数分桶的自适应权重。
 
 对比方案：
-  A. baseline     : w=0.5, bias=0（当前线上配置）
+  A. baseline     : w=0.5, bias=0（等权参考配置）
   B. 全局细粒度   : w∈[0,1] 步长0.01 × bias∈[-0.4,0.4] 步长0.05，val 上网格搜索
   C. 长度分桶自适应: 按段落字数分桶，每桶在 val 上学最优 w（bias 固定 0）
                     test 按桶套用对应权重
 
-稳健性：test 上对 AUC 做 bootstrap 95% CI，判断差异是否显著。
+稳健性：test 上按原文/仿写配对抽样给出 AUC 95% CI。
+方案选择仅基于 val；同一 test 的多方案结果仍只能作探索性分析。
 
 输入 : reports/v2/calibrated_probs.npz
        data/v2/valid_pairs_style_500.jsonl（id → 段落长度）
@@ -59,12 +60,18 @@ def metrics(y_true, prob):
     }
 
 
-def bootstrap_auc(y_true, prob, n_boot=2000):
-    """test 段级 AUC 的 bootstrap 95% CI（有放回抽样）。"""
-    n = len(y_true)
+def bootstrap_auc(y_true, prob, ids, n_boot=2000):
+    """Resample whole original/rewrite pairs, not individual correlated rows."""
+    groups = {}
+    for index, sample_id in enumerate(ids):
+        pair_id = str(sample_id).rsplit("_", 1)[0]
+        groups.setdefault(pair_id, []).append(index)
+    group_indices = list(groups.values())
+    n_groups = len(group_indices)
     aucs = []
     for _ in range(n_boot):
-        idx = RNG.integers(0, n, size=n)
+        picked = RNG.integers(0, n_groups, size=n_groups)
+        idx = np.array([i for group in picked for i in group_indices[group]])
         if len(set(y_true[idx])) < 2:
             continue
         aucs.append(roc_auc_score(y_true[idx], prob[idx]))
@@ -72,13 +79,14 @@ def bootstrap_auc(y_true, prob, n_boot=2000):
     return {"boot_auc_lo": float(lo), "boot_auc_hi": float(hi)}
 
 
-def grid_search(y_v, ls_v, ll_v):
+def grid_search(y_v, ls_v, ll_v, bias_grid=None):
     """val 上网格搜索 (w, bias)：AUC 优先，同 AUC 取 Brier 小（与 train_fusion 一致）。"""
+    if bias_grid is None:
+        bias_grid = np.arange(-0.4, 0.4001, 0.05)
     best = None
     for w in np.arange(0.0, 1.0001, 0.01):
         logit = fused_logit(ls_v, ll_v, w, 0.0)
-        base_auc = roc_auc_score(y_v, sigmoid(logit))
-        for bias in np.arange(-0.4, 0.4001, 0.05):
+        for bias in bias_grid:
             fused = sigmoid(logit + bias)
             auc = roc_auc_score(y_v, fused)
             brier = brier_score_loss(y_v, fused)
@@ -92,6 +100,7 @@ def grid_search(y_v, ls_v, ll_v):
 def main():
     z = np.load(PROBS)
     y_v, y_t = z["val_labels"], z["test_labels"]
+    test_ids = z["test_ids"]
     ls_v, ll_v = z["syntax_val"], z["lexical_val"]
     ls_t, ll_t = z["syntax_test"], z["lexical_test"]
 
@@ -114,7 +123,7 @@ def main():
         "w_syntax": 0.5, "bias": 0.0,
         "val": metrics(y_v, p_v),
         "test": metrics(y_t, p_t),
-        "test_auc_ci": bootstrap_auc(y_t, p_t),
+        "test_auc_ci": bootstrap_auc(y_t, p_t, test_ids),
     }
     print(f"[A baseline] w=0.5      val_AUC={report['baseline']['val']['auc']:.4f} "
           f"test_AUC={report['baseline']['test']['auc']:.4f} "
@@ -128,31 +137,33 @@ def main():
         "w_syntax": bw, "bias": bb,
         "val": {"auc": bv_auc, "brier": bv_brier},
         "test": metrics(y_t, p_t_b),
-        "test_auc_ci": bootstrap_auc(y_t, p_t_b),
+        "test_auc_ci": bootstrap_auc(y_t, p_t_b, test_ids),
     }
     print(f"[B global ] w={bw:.2f} bias={bb:+.2f} val_AUC={bv_auc:.4f} "
           f"test_AUC={report['global_fine']['test']['auc']:.4f} "
           f"CI=({report['global_fine']['test_auc_ci']['boot_auc_lo']:.4f}, "
           f"{report['global_fine']['test_auc_ci']['boot_auc_hi']:.4f})", flush=True)
 
-    # ---- w 响应面（bias=0，每 0.02）----
+    # ---- 仅验证集响应面（bias=0，每 0.02）；不要对 test 扫权重 ----
     resp = []
     for w in np.arange(0.0, 1.0001, 0.02):
         resp.append({
             "w": round(float(w), 2),
             "val_auc": float(roc_auc_score(y_v, sigmoid(fused_logit(ls_v, ll_v, w)))),
-            "test_auc": float(roc_auc_score(y_t, sigmoid(fused_logit(ls_t, ll_t, w)))),
         })
     report["w_response"] = resp
 
     # ---- C. 长度分桶自适应权重（每桶独立搜 w，bias=0）----
     buckets = [("<170", 0, 170), ("170-195", 170, 195), (">=195", 195, 10 ** 9)]
     bucket_info, test_fused = [], []
+    p_v_c = np.empty_like(y_v, dtype=float)
     for name, lo, hi in buckets:
         iv = np.where((len_v >= lo) & (len_v < hi))[0]
         it = np.where((len_t >= lo) & (len_t < hi))[0]
         if len(iv) >= 15 and len(set(y_v[iv])) == 2:
-            wb, _, auc_b, brier_b = grid_search(y_v[iv], ls_v[iv], ll_v[iv])
+            wb, _, auc_b, brier_b = grid_search(
+                y_v[iv], ls_v[iv], ll_v[iv], bias_grid=(0.0,)
+            )
             p_t_bk = sigmoid(fused_logit(ls_t[it], ll_t[it], wb))
             test_fused.extend(p_t_bk.tolist())
             test_idx = it.tolist()
@@ -162,21 +173,26 @@ def main():
             p_t_bk = sigmoid(fused_logit(ls_t[it], ll_t[it], wb))
             test_fused.extend(p_t_bk.tolist())
             test_idx = it.tolist()
-            auc_b, brier_b = bv_auc, bv_brier
+        if len(iv):
+            p_v_c[iv] = sigmoid(fused_logit(ls_v[iv], ll_v[iv], wb))
+            brier_b = brier_score_loss(y_v[iv], p_v_c[iv])
+            auc_b = roc_auc_score(y_v[iv], p_v_c[iv]) if len(set(y_v[iv])) == 2 else None
+        else:
+            auc_b, brier_b = None, None
         bucket_info.append({
             "bucket": name, "len_range": [lo, hi],
             "n_val": int(len(iv)), "n_test": int(len(it)),
             "best_w_syntax": round(wb, 2),
-            "val_auc": round(auc_b, 4), "val_brier": round(brier_b, 4),
+            "val_auc": round(auc_b, 4) if auc_b is not None else None,
+            "val_brier": round(brier_b, 4) if brier_b is not None else None,
             "fallback": None if len(iv) >= 15 and len(set(y_v[iv])) == 2 else "global_fine",
         })
-        print(f"[C bucket {name:8s}] n_val={len(iv):3d} n_test={len(it):3d} w={wb:.2f} "
-              f"val_AUC={auc_b:.4f}", flush=True)
+        auc_text = f"{auc_b:.4f}" if auc_b is not None else "n/a"
+        print(f"[C bucket {name:8s}] n_val={len(iv):3d} n_test={len(it):3d} "
+              f"w={wb:.2f} val_AUC={auc_text}", flush=True)
 
     # 按桶拼接回原始顺序
     p_t_c = np.empty_like(p_t)
-    for info in bucket_info:
-        pass
     order = []
     for _, lo, hi in buckets:
         it = np.where((len_t >= lo) & (len_t < hi))[0]
@@ -184,31 +200,32 @@ def main():
     p_t_c[order] = test_fused
     report["length_adaptive"] = {
         "buckets": bucket_info,
+        "val": metrics(y_v, p_v_c),
         "test": metrics(y_t, p_t_c),
-        "test_auc_ci": bootstrap_auc(y_t, p_t_c),
+        "test_auc_ci": bootstrap_auc(y_t, p_t_c, test_ids),
     }
     print(f"[C length ] test_AUC={report['length_adaptive']['test']['auc']:.4f} "
           f"CI=({report['length_adaptive']['test_auc_ci']['boot_auc_lo']:.4f}, "
           f"{report['length_adaptive']['test_auc_ci']['boot_auc_hi']:.4f})", flush=True)
 
-    # ---- 结论 ----
+    # ---- 方案选择只看验证集；测试集仅报告探索性表现 ----
     t_base = report["baseline"]["test"]
     t_glob = report["global_fine"]["test"]
     t_len = report["length_adaptive"]["test"]
     report["conclusion"] = {
-        "global_better_than_baseline": (t_glob["auc"] - t_base["auc"]) > 0.001,
-        "length_better_than_baseline": (t_len["auc"] - t_base["auc"]) > 0.001,
+        "selected_on": "validation",
         "global_delta_auc": round(t_glob["auc"] - t_base["auc"], 4),
         "length_delta_auc": round(t_len["auc"] - t_base["auc"], 4),
         "recommended": None,
     }
-    best_auc = max(t_base["auc"], t_glob["auc"], t_len["auc"])
-    if best_auc == t_len["auc"]:
-        report["conclusion"]["recommended"] = "length_adaptive"
-    elif best_auc == t_glob["auc"]:
-        report["conclusion"]["recommended"] = "global_fine"
-    else:
-        report["conclusion"]["recommended"] = "baseline"
+    candidates = {
+        "baseline": report["baseline"]["val"],
+        "global_fine": report["global_fine"]["val"],
+        "length_adaptive": report["length_adaptive"]["val"],
+    }
+    report["conclusion"]["recommended"] = max(
+        candidates, key=lambda name: (candidates[name]["auc"], -candidates[name]["brier"])
+    )
 
     json.dump(report, open(REPORT, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
     print(f"\n报告: {REPORT}", flush=True)

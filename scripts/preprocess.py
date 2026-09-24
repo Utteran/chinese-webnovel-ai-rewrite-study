@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 r"""
 网文数据集预处理脚本
-输入: D:\MyDocument\素材\起点 下 txt 网文（gb18030/UTF-8 混合编码）
+输入: --source-dir 指定的 TXT 语料目录（gb18030/UTF-8 混合编码）
 输出: dataset.jsonl —— 每行一个 200±40 字的干净网文段落
 
 流程: 抽样书 → 智能转码 → 去头部噪音(广告/简介) → 章节识别 → 正文区间裁剪(避开头尾)
@@ -12,8 +12,8 @@ import re
 import json
 import random
 import hashlib
+import argparse
 
-SRC = r"D:\MyDocument\素材\起点"
 OUT_JSONL = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "dataset.jsonl")
 OUT_META = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data", "sample_books.txt")  # 抽样书单
 NUM_BOOKS = 30                          # 抽样篇数
@@ -157,14 +157,27 @@ def process_book(path):
 
 
 def main():
-    random.seed(SEED)
-    files = [f for f in os.listdir(SRC) if f.lower().endswith(".txt") and not DUP_RE.search(f)]
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--source-dir", required=True, help="directory containing licensed TXT sources")
+    parser.add_argument("--output-jsonl", default=OUT_JSONL)
+    parser.add_argument("--output-books", default=OUT_META)
+    parser.add_argument("--seed", type=int, default=SEED)
+    args = parser.parse_args()
+    if not os.path.isdir(args.source_dir):
+        parser.error(f"source directory does not exist: {args.source_dir}")
+    random.seed(args.seed)
+    files = sorted(
+        f for f in os.listdir(args.source_dir)
+        if f.lower().endswith(".txt") and not DUP_RE.search(f)
+    )
+    if not files:
+        parser.error("source directory contains no usable .txt files")
     sampled = random.sample(files, min(NUM_BOOKS, len(files)))
 
     all_paras = []                          # (book, chapter, para_id, text)
-    with open(OUT_META, "w", encoding="utf-8") as meta:
+    with open(args.output_books, "w", encoding="utf-8") as meta:
         for fi, fname in enumerate(sampled, 1):
-            paras = process_book(os.path.join(SRC, fname))
+            paras = process_book(os.path.join(args.source_dir, fname))
             book = fname[:-4]
             if len(paras) < PARAS_PER_BOOK:
                 meta.write(f"SKIP({len(paras)}): {fname}\n")
@@ -185,15 +198,16 @@ def main():
         seen.add(h)
         dedup.append({"book": book, "chapter": chap, "para_id": pid, "len": len(text), "text": text})
 
-    with open(OUT_JSONL, "w", encoding="utf-8") as f:
+    with open(args.output_jsonl, "w", encoding="utf-8") as f:
         for item in dedup:
             f.write(json.dumps(item, ensure_ascii=False) + "\n")
 
     lens = [len(p["text"]) for p in dedup]
     print(f"抽样书数: {len(sampled)}")
     print(f"产出段落数: {len(dedup)}（去重前 {len(all_paras)}）")
-    print(f"长度: min={min(lens)} max={max(lens)} 均值={sum(lens)/len(lens):.0f}")
-    print(f"meta 见 {OUT_META}")
+    if lens:
+        print(f"长度: min={min(lens)} max={max(lens)} 均值={sum(lens)/len(lens):.0f}")
+    print(f"meta 见 {args.output_books}")
 
 
 if __name__ == "__main__":

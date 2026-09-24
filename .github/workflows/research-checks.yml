@@ -1,0 +1,23 @@
+name: Research checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  data-integrity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+      - name: Check Python syntax
+        run: python -m compileall -q app.py scripts train tests
+      - name: Test split stability
+        run: python -m unittest discover -s tests -v
+      - name: Audit checked-in research data
+        run: python scripts/audit_dataset.py
