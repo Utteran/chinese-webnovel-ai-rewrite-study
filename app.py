@@ -8,7 +8,7 @@ r"""
   - 融合     : logit 空间线性加权（权重由验证集学习）
 复用 scripts/ 下的解析与特征提取模块，确保线上特征与训练一致。
 
-运行: AKTool\python.exe -m uvicorn app:app --host 127.0.0.1 --port 8000
+运行: python -m uvicorn app:app --host 127.0.0.1 --port 8000
 """
 import os
 import sys
@@ -40,12 +40,12 @@ FEAT_NAMES = os.path.join(REPORTS_DIR, "lexical_feature_names.json")
 CALIBRATION = os.path.join(REPORTS_DIR, "calibration.json")
 FUSION_REPORT = os.path.join(REPORTS_DIR, "fusion_report.json")
 
-# 判定档位（对校准后的 AI 参与概率）
+# 探索性档位：仅比较与本实验两类样本的相似倾向
 THRESHOLDS = [
-    (0.35, "偏人类", "text"),
+    (0.35, "原文样本倾向", "text"),
     (0.55, "不确定", "low"),
-    (0.75, "疑似 AI", "mid"),
-    (1.01, "高度疑似 AI", "high"),
+    (0.75, "仿写样本倾向", "mid"),
+    (1.01, "强仿写样本倾向", "high"),
 ]
 
 # 最终得分聚合参数
@@ -64,7 +64,7 @@ def warmup():
         print(f"[warmup] 预热失败(忽略): {e}", flush=True)
 
 
-app = FastAPI(title="文味 Detect 2.0", lifespan=None)
+app = FastAPI(title="中文网文 AI 仿写识别研究 · v2", lifespan=None)
 
 
 @app.on_event("startup")
@@ -230,7 +230,7 @@ def verdict(score):
     for th, label, level in THRESHOLDS:
         if score < th:
             return {"label": label, "level": level}
-    return {"label": "高度疑似 AI", "level": "high"}
+    return {"label": "强仿写样本倾向", "level": "high"}
 
 
 @app.post("/api/detect")
@@ -274,6 +274,9 @@ def detect(req: DetectRequest):
 
     return {
         "overall_score": overall,
+        "score_interpretation": "对本研究 DeepSeek 风格仿写类的模型分数；不能当作真实 AI 生成概率或来源证明",
+        "score_type": "synthetic_class_score",
+        # Legacy aliases retained for clients using the original API.
         "ai_presence": round(presence, 4),
         "ai_strength": round(strength, 4),
         "verdict": verdict(overall),
@@ -281,7 +284,7 @@ def detect(req: DetectRequest):
         "notes": notes,
         "stats": style_stats(text),
         "segments": segments,
-        "model": "文味 Detect 2.0 · 双分支校准融合 + 字数加权判定 (442对风格模仿训练)",
+        "model": "中文网文 AI 仿写识别研究 · v2（442 对风格模仿样本）",
     }
 
 

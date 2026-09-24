@@ -1,65 +1,102 @@
 # -*- coding: utf-8 -*-
-r"""
-V2 阶段5: 数据准备 —— 按书划分 + 句式分支数据展开
-==================================================
-严格按"书"划分 train/val/test（70/15/15），防止同一作者的写作风格
-同时出现在训练与测试中造成泄漏（1.0 已确立的核心原则）。
+"""Build V2 classification rows using a locked, book-level split manifest.
 
-输出 :
-  - data/v2/splits.json              书 → split 映射
-  - data/v2/syntax_train_data.jsonl  句式分支分类数据
-      每行: {id, pair_id, book, text=dep_seq, label(0原文/1重写), split}
+The checked-in split is part of the published experiment. Re-running this
+script must not silently change it. Use --new-split only for a new experiment.
 """
-import os
+
+import argparse
 import json
 import random
 from collections import Counter
+from pathlib import Path
 
-_BASE = os.path.dirname(os.path.abspath(__file__))
-DATA = os.path.join(_BASE, "..", "data", "v2")
-PAIRS = os.path.join(DATA, "valid_pairs_style_500.jsonl")
-SYNTAX = os.path.join(DATA, "syntax_pairs_500.jsonl")
-OUT_SPLITS = os.path.join(DATA, "splits.json")
-OUT_SYNTAX = os.path.join(DATA, "syntax_train_data.jsonl")
+ROOT = Path(__file__).resolve().parents[1]
+DATA = ROOT / "data" / "v2"
+PAIRS = DATA / "valid_pairs_style_500.jsonl"
+SYNTAX = DATA / "syntax_pairs_500.jsonl"
+OUT_SPLITS = DATA / "splits.json"
+OUT_SYNTAX = DATA / "syntax_train_data.jsonl"
 SEED = 2026
+SPLIT_NAMES = {"train", "val", "test"}
 
-random.seed(SEED)
 
-pairs = [json.loads(l) for l in open(PAIRS, encoding="utf-8")]
-syntax = {r["id"] + "_" + r["label_src"]: r for r in (json.loads(l) for l in open(SYNTAX, encoding="utf-8"))}
+def read_jsonl(path):
+    with path.open(encoding="utf-8") as handle:
+        return [json.loads(line) for line in handle if line.strip()]
 
-# ---- 按书划分 ----
-books = list({p["book"] for p in pairs})
-random.shuffle(books)
-n = len(books)
-n_train = max(1, int(n * 0.7))
-n_val = max(1, int(n * 0.15))
-split = {b: ("train" if i < n_train else "val" if i < n_train + n_val else "test")
-         for i, b in enumerate(books)}
 
-# ---- 展开句式分类数据 ----
-rows = []
-for p in pairs:
-    s = split[p["book"]]
-    for label_src, label in (("original", 0), ("rewritten", 1)):
-        key = p["id"] + "_" + label_src
-        r = syntax[key]
-        rows.append({
-            "id": key,
-            "pair_id": p["id"],
-            "book": p["book"],
-            "text": r["dep_seq"],
-            "label": label,
-            "split": s,
-        })
+def make_book_split(books, seed=SEED):
+    """Sort before shuffling so hash randomization cannot change the split."""
+    ordered = sorted(set(books))
+    if len(ordered) < 3:
+        raise ValueError("At least three books are needed for train/val/test")
+    random.Random(seed).shuffle(ordered)
+    n_train = max(1, int(len(ordered) * 0.7))
+    n_val = max(1, int(len(ordered) * 0.15))
+    return {
+        book: "train" if i < n_train else "val" if i < n_train + n_val else "test"
+        for i, book in enumerate(ordered)
+    }
 
-with open(OUT_SPLITS, "w", encoding="utf-8") as f:
-    json.dump({"book_split": split, "n_books": n}, f, ensure_ascii=False, indent=2)
-with open(OUT_SYNTAX, "w", encoding="utf-8") as f:
-    for row in rows:
-        f.write(json.dumps(row, ensure_ascii=False) + "\n")
 
-print(f"配对数: {len(pairs)} | 书数: {n}")
-print("书划分:", dict(Counter(split.values())))
-print("样本划分:", dict(Counter(r["split"] for r in rows)))
-print("标签分布:", dict(Counter(r["label"] for r in rows)))
+def load_or_make_split(books, manifest=OUT_SPLITS, new_split=False, seed=SEED):
+    expected = set(books)
+    if manifest.exists() and not new_split:
+        saved = json.loads(manifest.read_text(encoding="utf-8"))["book_split"]
+        if set(saved) != expected or set(saved.values()) != SPLIT_NAMES:
+            raise ValueError("Existing split manifest does not match the books or split names")
+        return saved, False
+    return make_book_split(expected, seed), True
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--new-split", action="store_true",
+                        help="replace the published split; invalidates existing model reports")
+    parser.add_argument("--seed", type=int, default=SEED,
+                        help="seed used only with --new-split or when no manifest exists")
+    args = parser.parse_args()
+
+    pairs = read_jsonl(PAIRS)
+    syntax_rows = read_jsonl(SYNTAX)
+    syntax = {(row["id"], row["label_src"]): row for row in syntax_rows}
+    if len(syntax) != len(syntax_rows):
+        raise ValueError("Duplicate (id, label_src) in syntax pairs")
+
+    split, created = load_or_make_split(
+        (pair["book"] for pair in pairs), new_split=args.new_split, seed=args.seed
+    )
+    rows = []
+    for pair in pairs:
+        for source, label in (("original", 0), ("rewritten", 1)):
+            parsed = syntax[(pair["id"], source)]
+            if parsed["book"] != pair["book"]:
+                raise ValueError(f"Book mismatch for {pair['id']} {source}")
+            rows.append({
+                "id": f"{pair['id']}_{source}",
+                "pair_id": pair["id"],
+                "book": pair["book"],
+                "text": parsed["dep_seq"],
+                "label": label,
+                "split": split[pair["book"]],
+            })
+
+    if len(rows) != 2 * len(pairs) or len(syntax) != len(rows):
+        raise ValueError("Pair and syntax row counts differ")
+    if created:
+        OUT_SPLITS.write_text(
+            json.dumps({"book_split": split, "n_books": len(split), "seed": args.seed},
+                       ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+        )
+    with OUT_SYNTAX.open("w", encoding="utf-8", newline="\n") as handle:
+        for row in rows:
+            handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+    print(f"pairs={len(pairs)} books={len(split)} split_manifest={'new' if created else 'reused'}")
+    print("book splits:", dict(Counter(split.values())))
+    print("sample splits:", dict(Counter(row["split"] for row in rows)))
+
+
+if __name__ == "__main__":
+    main()

@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 """纯文本 Transformer AI 味分类器训练。输入仅为 text + label，不使用人工统计特征。"""
 import os
-os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
-os.environ["HF_HUB_ENDPOINT"] = "https://hf-mirror.com"
 import json
 import random
 import numpy as np
